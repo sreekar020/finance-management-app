@@ -1,141 +1,111 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Plus, ChevronRight, IndianRupee, Edit2, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, Plus } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
-import { subscribeToCustomersByTour, deleteCustomer } from '../../api/customerService';
-import { COLORS, SPACE, ROUNDING, SHADOWS } from '../../theme/Theme';
+import { subscribeToCustomersByTour } from '../../api/customerService';
+import { TYPOGRAPHY } from '../../theme/Theme';
 
-export const CustomerListScreen = ({ route, navigation }) => {
+const EMOJIS = ['✈️', '🎒', '🏕️', '🏖️', '🗺️', '⛰️', '🚢', '🚆', '🏜️'];
+
+export const CustomerListScreen = ({ route, navigation }: any) => {
   const { tourId, tourName, pricePerHead } = route.params;
   const { role } = useAuth();
-  
-  const [customers, setCustomers] = useState([]);
+
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = subscribeToCustomersByTour(tourId, (data, error) => {
-      if (!error && data) {
-        setCustomers(data);
-      }
+      if (!error && data) setCustomers(data);
       setLoading(false);
     });
     return () => unsubscribe();
   }, [tourId]);
 
-  const handleDelete = (customerId, name, membersCount) => {
-    Alert.alert(
-      "Delete Customer Booking",
-      `Are you sure you want to delete "${name}" group? This removes all their payments and members.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: async () => {
-            const result = await deleteCustomer(customerId, tourId, membersCount);
-            if (!result.success) Alert.alert("Error", "Failed to delete customer.");
-          }
-        }
-      ]
-    );
-  };
+  const renderCustomerCard = ({ item, index }: { item: any; index: number }) => {
+    const travelerText = item.membersCount === 1 ? 'Solo Traveler' : `${item.membersCount} Travelers`;
+    const emoji = EMOJIS[index % EMOJIS.length];
 
-  const renderCustomerCard = ({ item }) => {
     return (
-      <TouchableOpacity 
-        style={styles.cardContainer}
-        onPress={() => navigation.navigate('CustomerDetail', { 
-          customer: item, 
-          tourName 
-        })}
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('CustomerDetail', { customer: item, tourName })}
       >
-        <LinearGradient
-          colors={[COLORS.card, 'rgba(255, 255, 255, 0.4)']}
-          style={styles.card}
-        >
-          <View style={styles.cardTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headName}>{item.headMemberName || 'Unknown Group'}</Text>
-              <Text style={styles.groupTypeBadge}>{item.groupType?.toUpperCase()} • {item.membersCount} {item.membersCount === 1 ? 'Member' : 'Members'}</Text>
-            </View>
-            <View style={styles.actions}>
-              {(role === 'admin' || role === 'manager') && (
-                <>
-                  <TouchableOpacity 
-                    style={styles.actionBtn}
-                    onPress={() => navigation.navigate('EditCustomer', { customer: item, tourName, pricePerHead })}
-                  >
-                    <Edit2 color={COLORS.primary} size={20} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(item.id, item.headMemberName, item.membersCount)} style={styles.actionBtn}>
-                    <Trash2 color={COLORS.danger} size={20} />
-                  </TouchableOpacity>
-                </>
-              )}
-              <ChevronRight color={COLORS.textLight} size={24} style={{ marginLeft: SPACE.xs }} />
-            </View>
+        <View style={styles.cardTopRow}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarEmoji}>{emoji}</Text>
           </View>
-          <View style={styles.cardBottom}>
-            <View style={styles.financialCol}>
-              <Text style={styles.finLabel}>Total</Text>
-              <Text style={styles.finValue}>₹{item.totalAmount}</Text>
-            </View>
-            <View style={styles.financialCol}>
-              <Text style={styles.finLabel}>Paid</Text>
-              <Text style={[styles.finValue, { color: COLORS.secondary }]}>₹{item.paidAmount}</Text>
-            </View>
-            <View style={styles.financialCol}>
-              <Text style={styles.finLabel}>Due</Text>
-              <Text style={[styles.finValue, { color: item.dueAmount > 0 ? COLORS.danger : COLORS.success }]}>₹{item.dueAmount}</Text>
-            </View>
+          <View style={styles.nameContainer}>
+            <Text style={styles.customerName}>{item.headMemberName || 'Unknown Group'}</Text>
+            <Text style={styles.travelerText}>{travelerText}</Text>
           </View>
-        </LinearGradient>
+          <ChevronRight color="#D1D5DB" size={20} />
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.statsContainer}>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Total</Text>
+            <Text style={styles.statValue}>₹{Number(item.totalAmount).toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Paid</Text>
+            <Text style={[styles.statValue, { color: '#9CA3AF' }]}>
+              ₹{Number(item.paidAmount).toLocaleString('en-IN')}
+            </Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>Due</Text>
+            <Text style={[styles.statValue, { color: '#EF4444', fontSize: 18 }]}>
+              ₹{Number(item.dueAmount).toLocaleString('en-IN')}
+            </Text>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3D8EE8" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={[COLORS.background, '#f1f5f9']} style={StyleSheet.absoluteFill} />
-      
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft color={COLORS.text} size={28} />
+          <ArrowLeft color="#1F2937" size={24} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.greeting} numberOfLines={1}>{tourName}</Text>
+          <Text style={styles.title}>{tourName}</Text>
           <Text style={styles.subtitle}>Customers & Bookings</Text>
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={customers}
-          keyExtractor={item => item.id}
-          renderItem={renderCustomerCard}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No customers booked for this tour.</Text>
-            </View>
-          }
-        />
-      )}
+      <FlatList
+        data={customers}
+        keyExtractor={(item) => item.id}
+        renderItem={renderCustomerCard}
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No customers booked for this tour.</Text>
+          </View>
+        }
+      />
 
       {role === 'admin' && (
-        <TouchableOpacity 
-          style={styles.fab} 
+        <TouchableOpacity
+          style={styles.fab}
           onPress={() => navigation.navigate('AddCustomer', { tourId, tourName, pricePerHead })}
         >
-          <LinearGradient colors={[COLORS.primary, COLORS.secondary]} style={styles.fabGradient}>
-            <Plus color={COLORS.white} size={24} />
-          </LinearGradient>
+          <Plus color="#FFFFFF" size={24} />
         </TouchableOpacity>
       )}
     </SafeAreaView>
@@ -143,27 +113,68 @@ export const CustomerListScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.md, paddingTop: SPACE.md, marginBottom: SPACE.md },
-  backBtn: { padding: SPACE.xs, marginRight: SPACE.sm },
+  container: { flex: 1, backgroundColor: '#F0F4FA' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F4FA' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  backBtn: { marginRight: 12, padding: 4 },
   headerTitleContainer: { flex: 1 },
-  greeting: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
-  subtitle: { fontSize: 14, color: COLORS.textLight },
-  listContainer: { paddingBottom: SPACE.xl * 4 },
-  cardContainer: { marginHorizontal: SPACE.md, marginBottom: SPACE.sm, borderRadius: ROUNDING.lg, ...SHADOWS.glass },
-  card: { borderRadius: ROUNDING.lg, padding: SPACE.md, borderWidth: 1, borderColor: COLORS.border },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: SPACE.sm, marginBottom: SPACE.sm },
-  headName: { fontSize: 18, fontWeight: '600', color: COLORS.text },
-  groupTypeBadge: { fontSize: 12, color: COLORS.textLight, marginTop: 4, fontWeight: '500' },
-  actions: { flexDirection: 'row', alignItems: 'center' },
-  actionBtn: { padding: SPACE.sm, marginLeft: SPACE.xs },
-  cardBottom: { flexDirection: 'row', justifyContent: 'space-between' },
-  financialCol: { alignItems: 'center' },
-  finLabel: { fontSize: 12, color: COLORS.textLight, marginBottom: 2 },
-  finValue: { fontSize: 14, fontWeight: 'bold', color: COLORS.text },
-  emptyContainer: { alignItems: 'center', marginTop: SPACE.xl * 2 },
-  emptyText: { color: COLORS.textLight, fontSize: 16 },
-  fab: { position: 'absolute', bottom: SPACE.xl, right: SPACE.md, width: 60, height: 60, borderRadius: 30, ...SHADOWS.glass, elevation: 8 },
-  fabGradient: { width: '100%', height: '100%', borderRadius: 30, justifyContent: 'center', alignItems: 'center' }
+  title: { fontFamily: TYPOGRAPHY.fontFamilyBold, fontSize: 24, fontWeight: 'bold', color: '#1F2937' },
+  subtitle: { fontFamily: TYPOGRAPHY.fontFamily, fontSize: 13, color: '#9CA3AF', marginTop: 2 },
+  listContainer: { paddingHorizontal: 16, paddingBottom: 100 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center' },
+  avatarContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarEmoji: { fontSize: 20 },
+  nameContainer: { flex: 1 },
+  customerName: { fontFamily: TYPOGRAPHY.fontFamilyBold, fontSize: 16, fontWeight: 'bold', color: '#1F2937', marginBottom: 2 },
+  travelerText: { fontFamily: TYPOGRAPHY.fontFamily, fontSize: 12, color: '#9CA3AF' },
+  divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 14 },
+  statsContainer: { gap: 8 },
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statLabel: { fontFamily: TYPOGRAPHY.fontFamilyMedium, fontSize: 12, color: '#6B7280' },
+  statValue: { fontFamily: TYPOGRAPHY.monospace, fontSize: 16, fontWeight: 'bold', color: '#1F2937' },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyText: { fontFamily: TYPOGRAPHY.fontFamily, color: '#9CA3AF', fontSize: 16 },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3D8EE8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#3D8EE8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
 });

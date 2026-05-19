@@ -1,25 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
-import { LinearGradient } from 'expo-linear-gradient';
-import { IndianRupee, Trash2, Edit2 } from 'lucide-react-native';
 import { COLORS, SPACE, ROUNDING, SHADOWS } from '../theme/Theme';
 
-// Using IndianRupee because user has local time set to India (often used in these projects), but it's just an icon.
-export const ExpenseCard = ({ expense, isAdmin, onDelete, onEdit }) => {
+export const ExpenseCard = ({ expense, isAdmin, onDelete, onEdit }: any) => {
   // Format date safely
   const formattedDate = expense.createdAt?.seconds 
-    ? format(new Date(expense.createdAt.seconds * 1000), 'MMM dd, yyyy • hh:mm a')
+    ? format(new Date(expense.createdAt.seconds * 1000), 'MMM dd, yyyy')
     : 'Pending sync...';
 
   return (
     <View style={styles.cardContainer}>
-      <LinearGradient
-        colors={[COLORS.card, 'rgba(255, 255, 255, 0.4)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.card}
-      >
+      <View style={styles.card}>
         <View style={styles.content}>
           <View style={styles.leftContent}>
             <Text style={styles.description} numberOfLines={2}>
@@ -27,45 +19,44 @@ export const ExpenseCard = ({ expense, isAdmin, onDelete, onEdit }) => {
             </Text>
             <Text style={styles.date}>{formattedDate}</Text>
             {isAdmin && (expense.userEmail || expense.userId) && (
-              <Text style={styles.userBadge}>{expense.userEmail || `User ID: ${expense.userId.substring(0, 8)}...`}</Text>
+              <Text style={styles.userBadge}>Paid by: {expense.userEmail || expense.userId.substring(0, 8)}</Text>
             )}
           </View>
           
           <View style={styles.rightContent}>
             <View style={styles.amountContainer}>
-              <IndianRupee size={16} color={COLORS.primary} />
-              <Text style={styles.amount}>{expense.amount?.toFixed(2)}</Text>
+              <Text style={styles.amount}>₹{expense.amount?.toFixed(2)}</Text>
             </View>
             
             {isAdmin && (
               <View style={styles.actions}>
-                <TouchableOpacity onPress={() => onEdit && onEdit(expense)} style={styles.iconButton}>
-                  <Edit2 size={18} color={COLORS.textLight} />
+                <TouchableOpacity onPress={() => onEdit && onEdit(expense)} style={styles.textBtn}>
+                  <Text style={styles.textBtnLabel}>Edit</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => onDelete && onDelete(expense.id)} style={styles.iconButton}>
-                  <Trash2 size={18} color={COLORS.danger} />
+                <TouchableOpacity onPress={() => onDelete && onDelete(expense.id)} style={styles.textBtn}>
+                  <Text style={[styles.textBtnLabel, { color: COLORS.danger }]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
         </View>
-      </LinearGradient>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   cardContainer: {
-    marginBottom: SPACE.md,
+    marginBottom: SPACE.sm,
     marginHorizontal: SPACE.md,
-    borderRadius: ROUNDING.lg,
-    ...SHADOWS.glass,
+    borderRadius: ROUNDING.md,
   },
   card: {
-    borderRadius: ROUNDING.lg,
+    backgroundColor: COLORS.white,
+    borderRadius: ROUNDING.md,
     padding: SPACE.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#e2e8f0',
   },
   content: {
     flexDirection: 'row',
@@ -102,15 +93,19 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.primary,
-    marginLeft: 2,
+    color: COLORS.text,
   },
   actions: {
     flexDirection: 'row',
-    marginTop: SPACE.md,
-    gap: SPACE.sm,
+    marginTop: SPACE.sm,
+    gap: SPACE.md,
   },
-  iconButton: {
-    padding: SPACE.xs,
+  textBtn: {
+    paddingVertical: 4,
+  },
+  textBtnLabel: {
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: 'bold'
   }
 });

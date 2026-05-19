@@ -1,51 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { LogOut, ChevronRight } from 'lucide-react-native';
+import { LogOut, Users } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { subscribeToTours } from '../../api/tourService';
-import { COLORS, SPACE, ROUNDING, SHADOWS } from '../../theme/Theme';
+import { TYPOGRAPHY } from '../../theme/Theme';
 import { format } from 'date-fns';
+import { Tour } from '../../types';
 
-export const TourListScreen = ({ navigation }) => {
-  const { user, logout } = useAuth();
-  const [tours, setTours] = useState([]);
+export const TourListScreen = ({ navigation }: any) => {
+  const { logout } = useAuth();
+  const [tours, setTours] = useState<Tour[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Staff can see all tours
     const unsubscribe = subscribeToTours((data, error) => {
-      if (!error) {
-        setTours(data);
-      }
+      if (!error) setTours(data || []);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  const renderTourCard = ({ item }) => {
+  const renderTourCard = ({ item }: { item: Tour }) => {
     const formattedDate = item.createdAt?.seconds
-      ? format(new Date(item.createdAt.seconds * 1000), 'MMM dd, yyyy')
-      : 'Just now';
+      ? format(new Date(item.createdAt.seconds * 1000), 'MMM dd yyyy')
+      : '';
 
     return (
-      <TouchableOpacity 
-        style={styles.cardContainer}
-        onPress={() => navigation.navigate('StaffTourDetail', { tourId: item.id, tourName: item.name, pricePerHead: item.pricePerHead })}
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.9}
+        onPress={() =>
+          navigation.navigate('StaffTourDetail', {
+            tourId: item.id,
+            tourName: item.name,
+            pricePerHead: item.pricePerHead,
+          })
+        }
       >
-        <LinearGradient
-          colors={[COLORS.card, 'rgba(255, 255, 255, 0.4)']}
-          style={styles.card}
-        >
-          <View style={styles.cardContent}>
-            <View>
-              <Text style={styles.tourName}>{item.name}</Text>
-              <Text style={styles.tourDate}>Created: {formattedDate}</Text>
-            </View>
-            <ChevronRight color={COLORS.primary} size={24} />
-          </View>
-        </LinearGradient>
+        <Text style={styles.tourName}>{item.name}</Text>
+        {formattedDate ? <Text style={styles.tourDate}>Created: {formattedDate}</Text> : null}
+        <View style={styles.passengerRow}>
+          <Users color="#3D8EE8" size={16} style={{ marginRight: 6 }} />
+          <Text style={styles.passengerText}>{item.passengerCount || 0} Passengers</Text>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -53,28 +51,26 @@ export const TourListScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color="#3D8EE8" />
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={[COLORS.background, '#f1f5f9']} style={StyleSheet.absoluteFill} />
-      
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Available Tours</Text>
-          <Text style={styles.subtitle}>{user?.email}</Text>
+        <View style={styles.headerTitles}>
+          <Text style={styles.title}>Available Tours</Text>
+          <Text style={styles.subtitle}>Tap a tour to manage expenses</Text>
         </View>
         <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <LogOut color={COLORS.danger} size={24} />
+          <LogOut color="#EF4444" size={24} />
         </TouchableOpacity>
       </View>
 
       <FlatList
         data={tours}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         renderItem={renderTourCard}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
@@ -88,21 +84,63 @@ export const TourListScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#F0F4FA' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F4FA' },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACE.md, paddingTop: SPACE.md, paddingBottom: SPACE.md
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
-  greeting: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
-  subtitle: { fontSize: 14, color: COLORS.textLight },
-  logoutBtn: { padding: SPACE.xs },
-  listContainer: { paddingBottom: SPACE.xl * 2 },
-  cardContainer: { marginHorizontal: SPACE.md, marginBottom: SPACE.sm, borderRadius: ROUNDING.lg, ...SHADOWS.glass },
-  card: { borderRadius: ROUNDING.lg, padding: SPACE.md, borderWidth: 1, borderColor: COLORS.border },
-  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tourName: { fontSize: 18, fontWeight: '600', color: COLORS.text },
-  tourDate: { fontSize: 12, color: COLORS.textLight, marginTop: 4 },
-  emptyContainer: { alignItems: 'center', marginTop: SPACE.xl * 2 },
-  emptyText: { color: COLORS.textLight, fontSize: 16 }
+  headerTitles: { flex: 1 },
+  title: {
+    fontFamily: TYPOGRAPHY.fontFamilyBold,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  subtitle: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  logoutBtn: { padding: 6 },
+  listContainer: { paddingHorizontal: 16, paddingBottom: 60 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  tourName: {
+    fontFamily: TYPOGRAPHY.fontFamilyBold,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  tourDate: {
+    fontFamily: TYPOGRAPHY.fontFamily,
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 12,
+  },
+  passengerRow: { flexDirection: 'row', alignItems: 'center' },
+  passengerText: {
+    fontFamily: TYPOGRAPHY.fontFamilyBold,
+    color: '#3D8EE8',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyText: { fontFamily: TYPOGRAPHY.fontFamily, color: '#9CA3AF', fontSize: 16 },
 });

@@ -1,26 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Plus, IndianRupee, User, Star, CheckCircle, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Users, User, Star, Trash2 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { subscribeToMembersByCustomer } from '../../api/memberService';
 import { subscribeToPaymentsByCustomer, addPayment, deletePayment } from '../../api/paymentService';
-import { COLORS, SPACE, ROUNDING, SHADOWS } from '../../theme/Theme';
+import { TYPOGRAPHY } from '../../theme/Theme';
 import { format } from 'date-fns';
 
-export const CustomerDetailScreen = ({ route, navigation }) => {
+export const CustomerDetailScreen = ({ route, navigation }: any) => {
   const { customer, tourName } = route.params;
   const { user, role } = useAuth();
-  
-  const [members, setMembers] = useState([]);
-  const [payments, setPayments] = useState([]);
-  
-  // Notice we must use the LIVE values of due/paid from the customer updates via another listener or just trust the DB since it triggers a re-render if we were capturing the customer LIVE.
-  // To keep it clean without excessive reads, we will update the local state optimistically or listen.
+
+  const [members, setMembers] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [currentPaid, setCurrentPaid] = useState(customer.paidAmount || 0);
   const [currentDue, setCurrentDue] = useState(customer.dueAmount || 0);
-
   const [paymentAmount, setPaymentAmount] = useState('');
   const [mode, setMode] = useState('cash');
   const [receiverName, setReceiverName] = useState('');
@@ -31,113 +30,67 @@ export const CustomerDetailScreen = ({ route, navigation }) => {
     const unsubMembers = subscribeToMembersByCustomer(customer.id, (data) => {
       if (data) setMembers(data);
     });
-    
     const unsubPayments = subscribeToPaymentsByCustomer(customer.id, (data) => {
       if (data) {
         setPayments(data);
-        // Recalculate cleanly based on verified payments
-        const totPaid = data.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const totPaid = data.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
         setCurrentPaid(totPaid);
         setCurrentDue(customer.totalAmount - totPaid);
       }
     });
-
-    return () => {
-      unsubMembers();
-      unsubPayments();
-    };
+    return () => { unsubMembers(); unsubPayments(); };
   }, [customer.id, customer.totalAmount]);
 
   const handleAddPayment = async () => {
     const amt = Number(paymentAmount);
-    if (isNaN(amt) || amt <= 0) {
-      return Alert.alert("Invalid Input", "Please enter a valid amount.");
-    }
-    if (amt > currentDue) {
-      return Alert.alert("Invalid Amount", "Payment cannot exceed due amount.");
-    }
-
-    if (!receiverName.trim()) {
-      return Alert.alert("Invalid Input", "Name of person receiving the money is required.");
-    }
-
-    if (mode === 'online') {
-      if (!receiverPhone.trim()) {
-        return Alert.alert("Invalid Input", "Receiver Phone is required for online payments.");
-      }
-    }
-
+    if (isNaN(amt) || amt <= 0) return Alert.alert('Invalid Input', 'Please enter a valid amount.');
+    if (amt > currentDue) return Alert.alert('Invalid Amount', 'Payment cannot exceed due amount.');
+    if (!receiverName.trim()) return Alert.alert('Invalid Input', 'Receiver name is required.');
+    if (mode === 'online' && !receiverPhone.trim())
+      return Alert.alert('Invalid Input', 'Receiver phone required for online payments.');
     setPaying(true);
-    const result = await addPayment(customer.id, amt, mode, receiverName, receiverPhone, currentDue, currentPaid, user.email || user.uid);
+    const result = await addPayment(
+      customer.id, amt, mode, receiverName, receiverPhone,
+      currentDue, currentPaid, user?.email || user?.uid || ''
+    );
     if (result.success) {
-      setPaymentAmount('');
-      setMode('cash');
-      setReceiverName('');
-      setReceiverPhone('');
+      setPaymentAmount(''); setMode('cash'); setReceiverName(''); setReceiverPhone('');
+      Alert.alert('Success', 'Payment recorded!');
     } else {
-      Alert.alert("Error", result.error?.message || "Failed to add payment.");
+      Alert.alert('Error', (result.error as any)?.message || 'Failed to add payment.');
     }
     setPaying(false);
   };
 
-  const handleDeletePayment = (paymentId, amount) => {
-    Alert.alert(
-      "Delete Payment",
-      `Are you sure you want to delete this payment of ₹${amount}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: async () => {
-            const result = await deletePayment(paymentId, customer.id, amount);
-            if (!result.success) Alert.alert("Error", "Failed to delete payment.");
-          }
+  const handleDeletePayment = (paymentId: string, amount: number) => {
+    Alert.alert('Delete Payment', `Delete payment of ₹${amount}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          const result = await deletePayment(paymentId, customer.id, amount);
+          if (!result.success) Alert.alert('Error', 'Failed to delete payment.');
         }
-      ]
-    );
-  };
-
-  const renderPayment = ({ item }) => {
-    const d = item.createdAt?.seconds ? format(new Date(item.createdAt.seconds * 1000), 'MMM dd, yyyy hh:mm a') : 'Just now';
-    return (
-      <View style={styles.paymentCard}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.payAmount}>₹{item.amount}</Text>
-          <Text style={styles.payDate}>{d}</Text>
-          <Text style={styles.payDate}>{item.mode === 'online' ? 'Online' : 'Cash'} ({item.receiverName})</Text>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[styles.payUser, { marginBottom: SPACE.sm }]}>{item.addedBy?.substring(0, 12)}...</Text>
-          {(role === 'admin' || role === 'manager') && (
-            <TouchableOpacity onPress={() => handleDeletePayment(item.id, item.amount)}>
-              <Trash2 color={COLORS.danger} size={20} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
+      },
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={[COLORS.background, '#f1f5f9']} style={StyleSheet.absoluteFill} />
-      
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft color={COLORS.text} size={28} />
+          <ArrowLeft color="#1F2937" size={24} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.greeting} numberOfLines={1}>{customer.headMemberName}'s Group</Text>
+          <Text style={styles.title}>{customer.headMemberName}'s Group</Text>
           <Text style={styles.subtitle}>{tourName}</Text>
         </View>
+        <Users color="#3D8EE8" size={24} />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-          
-          {/* Financial Summary */}
-          <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.summaryCard}>
+
+          <LinearGradient colors={['#5B8DEE', '#3B6DD9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.summaryCard}>
             <View style={styles.sumRow}>
               <Text style={styles.sumLabel}>Total Package</Text>
               <Text style={styles.sumValue}>₹{customer.totalAmount}</Text>
@@ -146,98 +99,75 @@ export const CustomerDetailScreen = ({ route, navigation }) => {
               <Text style={styles.sumLabel}>Paid Amount</Text>
               <Text style={styles.sumValue}>₹{currentPaid}</Text>
             </View>
-            <View style={[styles.sumRow, { borderBottomWidth: 0, marginTop: SPACE.sm, paddingTop: SPACE.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' }]}>
+            <View style={styles.summaryDivider} />
+            <View style={[styles.sumRow, { marginBottom: 0 }]}>
               <Text style={styles.sumLabelDue}>Due Amount</Text>
               <Text style={styles.sumValueDue}>₹{currentDue}</Text>
             </View>
           </LinearGradient>
 
-          {/* Add Payment Form */}
-          {currentDue > 0 ? (
-            <View style={styles.paymentForm}>
-              <Text style={styles.sectionTitle}>Add Payment</Text>
-              <View style={styles.payInputRow}>
-                <TextInput
-                  style={styles.payInput}
-                  placeholder={`Amount (Max: ₹${currentDue})`}
-                  keyboardType="numeric"
-                  value={paymentAmount}
-                  onChangeText={setPaymentAmount}
-                />
-              </View>
-              
-              <View style={styles.modeTabs}>
-                <TouchableOpacity 
-                  style={[styles.modeTab, mode === 'cash' && styles.modeTabActive]} 
-                  onPress={() => setMode('cash')}>
-                  <Text style={[styles.modeTabText, mode === 'cash' && styles.modeTabTextActive]}>Cash</Text>
+          {currentDue > 0 && (
+            <View style={styles.payCard}>
+              <Text style={styles.cardTitle}>Add Payment</Text>
+              <TextInput style={styles.payInput} placeholder={`Amount (Max: ₹${currentDue})`} placeholderTextColor="#9CA3AF" keyboardType="numeric" value={paymentAmount} onChangeText={setPaymentAmount} />
+              <View style={styles.toggleRow}>
+                <TouchableOpacity style={[styles.toggleBtn, mode === 'cash' ? styles.toggleActive : styles.toggleInactive]} onPress={() => setMode('cash')}>
+                  <Text style={[styles.toggleText, mode === 'cash' ? styles.toggleTextActive : styles.toggleTextInactive]}>Cash</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modeTab, mode === 'online' && styles.modeTabActive]} 
-                  onPress={() => setMode('online')}>
-                  <Text style={[styles.modeTabText, mode === 'online' && styles.modeTabTextActive]}>Online</Text>
+                <TouchableOpacity style={[styles.toggleBtn, mode === 'online' ? styles.toggleActive : styles.toggleInactive]} onPress={() => setMode('online')}>
+                  <Text style={[styles.toggleText, mode === 'online' ? styles.toggleTextActive : styles.toggleTextInactive]}>Online</Text>
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.onlineInputs}>
-                <TextInput
-                  style={styles.payInput}
-                  placeholder={mode === 'cash' ? "Receiver Name (Collector)" : "Receiver Name"}
-                  value={receiverName}
-                  onChangeText={setReceiverName}
-                />
-                {mode === 'online' && (
-                  <TextInput
-                    style={[styles.payInput, { marginTop: SPACE.sm }]}
-                    placeholder="Receiver Phone"
-                    keyboardType="phone-pad"
-                    value={receiverPhone}
-                    onChangeText={setReceiverPhone}
-                  />
-                )}
-              </View>
-
-              <TouchableOpacity onPress={handleAddPayment} disabled={paying} style={[styles.payBtn, { marginTop: SPACE.md }]}>
-                {paying ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.payBtnText}>Pay</Text>}
+              <TextInput style={styles.payInput} placeholder={mode === 'cash' ? 'Receiver Name (Collector)' : 'Receiver Name'} placeholderTextColor="#9CA3AF" value={receiverName} onChangeText={setReceiverName} />
+              {mode === 'online' && (
+                <TextInput style={[styles.payInput, { marginTop: 0 }]} placeholder="Receiver Phone" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" value={receiverPhone} onChangeText={setReceiverPhone} />
+              )}
+              <TouchableOpacity onPress={handleAddPayment} disabled={paying} style={styles.payBtn}>
+                {paying ? <ActivityIndicator color="#FFF" /> : <Text style={styles.payBtnText}>Pay</Text>}
               </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.fullyPaid}>
-              <CheckCircle color={COLORS.success} size={24} style={{ marginRight: SPACE.sm }} />
-              <Text style={styles.fullyPaidText}>Fully Paid</Text>
             </View>
           )}
 
-          {/* Members List */}
           <Text style={styles.sectionTitle}>Members ({members.length})</Text>
-          <View style={styles.membersContainer}>
-            {members.length === 0 ? <ActivityIndicator color={COLORS.primary} /> : members.map((m) => (
+          <View style={styles.membersCard}>
+            {members.map((m, index) => (
               <View key={m.id} style={styles.memberRow}>
-                <View style={styles.memberAvatar}>
-                  <User color={COLORS.white} size={20} />
-                </View>
+                <View style={styles.memberAvatar}><User color="#FFF" size={20} /></View>
                 <View style={styles.memberInfo}>
                   <Text style={styles.memberName}>{m.name}</Text>
                   <Text style={styles.memberMeta}>{m.age} yrs • {m.gender.toUpperCase()}</Text>
                 </View>
                 {m.id === customer.headMemberId && (
-                  <View style={styles.headBadge}>
-                    <Star color={COLORS.white} size={12} style={{ marginRight: 2 }} />
+                  <LinearGradient colors={['#5B8DEE', '#3B6DD9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headBadge}>
+                    <Star color="#FFF" size={12} style={{ marginRight: 4 }} />
                     <Text style={styles.headBadgeText}>Head</Text>
-                  </View>
+                  </LinearGradient>
                 )}
+                {index < members.length - 1 && <View style={styles.rowDivider} />}
               </View>
             ))}
           </View>
 
-          {/* Payment History */}
           <Text style={styles.sectionTitle}>Payment History</Text>
           {payments.length === 0 ? (
             <Text style={styles.emptyText}>No payments made yet.</Text>
-          ) : (
-            payments.map(p => <View key={p.id}>{renderPayment({item: p})}</View>)
-          )}
-
+          ) : payments.map((p) => {
+            const d = p.createdAt?.seconds ? format(new Date(p.createdAt.seconds * 1000), 'MMM dd yyyy hh:mm a') : 'Just now';
+            return (
+              <View key={p.id} style={styles.paymentCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.payAmount}>₹{p.amount.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.payDate}>{d}</Text>
+                  <Text style={styles.payMeta}>{p.mode === 'online' ? 'Online' : 'Cash'} • {p.receiverName}</Text>
+                </View>
+                {(role === 'admin' || role === 'manager') && (
+                  <TouchableOpacity onPress={() => handleDeletePayment(p.id, p.amount)} style={{ padding: 6 }}>
+                    <Trash2 color="#EF4444" size={20} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -245,49 +175,45 @@ export const CustomerDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.md, paddingTop: SPACE.md, marginBottom: SPACE.md },
-  backBtn: { padding: SPACE.xs, marginRight: SPACE.sm },
+  container: { flex: 1, backgroundColor: '#F0F4FA' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  backBtn: { marginRight: 12, padding: 4 },
   headerTitleContainer: { flex: 1 },
-  greeting: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
-  subtitle: { fontSize: 14, color: COLORS.textLight },
-  scrollContainer: { padding: SPACE.md, paddingBottom: SPACE.xl * 3 },
-  
-  summaryCard: { padding: SPACE.lg, borderRadius: ROUNDING.lg, marginBottom: SPACE.xl, ...SHADOWS.glass },
-  sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACE.sm },
-  sumLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
-  sumValue: { color: COLORS.white, fontSize: 16, fontWeight: 'bold' },
-  sumLabelDue: { color: COLORS.white, fontSize: 18, fontWeight: 'bold' },
-  sumValueDue: { color: COLORS.white, fontSize: 24, fontWeight: 'bold' },
-
-  paymentForm: { backgroundColor: COLORS.white, padding: SPACE.md, borderRadius: ROUNDING.md, marginBottom: SPACE.xl, ...SHADOWS.glass },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: SPACE.md },
-  payInputRow: { flexDirection: 'row', gap: SPACE.sm },
-  payInput: { flex: 1, backgroundColor: '#f8fafc', padding: SPACE.md, borderRadius: ROUNDING.sm, borderWidth: 1, borderColor: '#e2e8f0', fontSize: 16 },
-  payBtn: { backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', paddingVertical: SPACE.md, borderRadius: ROUNDING.sm },
-  payBtnText: { color: COLORS.white, fontWeight: 'bold', fontSize: 16 },
-  modeTabs: { flexDirection: 'row', marginTop: SPACE.md, gap: SPACE.sm },
-  modeTab: { flex: 1, padding: SPACE.sm, borderRadius: ROUNDING.sm, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
-  modeTabActive: { backgroundColor: '#e0e7ff', borderColor: COLORS.primary },
-  modeTabText: { color: COLORS.textLight, fontWeight: '600' },
-  modeTabTextActive: { color: COLORS.primary, fontWeight: 'bold' },
-  onlineInputs: { marginTop: SPACE.md },
-  
-  fullyPaid: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ecfdf5', padding: SPACE.lg, borderRadius: ROUNDING.md, marginBottom: SPACE.xl, borderWidth: 1, borderColor: '#a7f3d0' },
-  fullyPaidText: { color: COLORS.success, fontSize: 18, fontWeight: 'bold' },
-
-  membersContainer: { backgroundColor: COLORS.white, borderRadius: ROUNDING.md, padding: SPACE.sm, marginBottom: SPACE.xl, ...SHADOWS.glass },
-  memberRow: { flexDirection: 'row', alignItems: 'center', padding: SPACE.sm, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  memberAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.secondary, justifyContent: 'center', alignItems: 'center', marginRight: SPACE.md },
+  title: { fontFamily: TYPOGRAPHY.fontFamilyBold, fontSize: 24, fontWeight: 'bold', color: '#1F2937' },
+  subtitle: { fontFamily: TYPOGRAPHY.fontFamily, fontSize: 14, color: '#9CA3AF', marginTop: 2 },
+  scrollContainer: { paddingHorizontal: 16, paddingBottom: 80 },
+  summaryCard: { paddingHorizontal: 22, paddingVertical: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#3B6DD9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 8 },
+  sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sumLabel: { fontFamily: TYPOGRAPHY.fontFamily, color: '#FFFFFF', opacity: 0.9, fontSize: 14 },
+  sumValue: { fontFamily: TYPOGRAPHY.monospace, color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+  summaryDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 8 },
+  sumLabelDue: { fontFamily: TYPOGRAPHY.fontFamilyBold, color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
+  sumValueDue: { fontFamily: TYPOGRAPHY.monospace, color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' },
+  payCard: { backgroundColor: '#FFFFFF', padding: 20, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 20 },
+  cardTitle: { fontFamily: TYPOGRAPHY.fontFamilyBold, fontSize: 18, fontWeight: 'bold', color: '#1F2937', marginBottom: 16 },
+  payInput: { height: 48, backgroundColor: '#FAFAFA', paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', fontSize: 15, color: '#1F2937', fontFamily: TYPOGRAPHY.fontFamily, marginBottom: 12 },
+  toggleRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  toggleBtn: { flex: 1, height: 48, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
+  toggleActive: { backgroundColor: '#EBF4FF', borderColor: '#3D8EE8', borderWidth: 2 },
+  toggleInactive: { backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' },
+  toggleText: { fontFamily: TYPOGRAPHY.fontFamilyBold, fontSize: 15 },
+  toggleTextActive: { color: '#3D8EE8' },
+  toggleTextInactive: { color: '#6B7280' },
+  payBtn: { backgroundColor: '#3D8EE8', height: 52, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
+  payBtnText: { fontFamily: TYPOGRAPHY.fontFamilyBold, color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
+  sectionTitle: { fontFamily: TYPOGRAPHY.fontFamilyBold, fontSize: 18, fontWeight: 'bold', color: '#1F2937', marginBottom: 12 },
+  membersCard: { backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', paddingVertical: 4, marginBottom: 20 },
+  memberRow: { height: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, position: 'relative' },
+  memberAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#7C3AED', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 16, fontWeight: '600', color: COLORS.text },
-  memberMeta: { fontSize: 12, color: COLORS.textLight },
-  headBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingHorizontal: SPACE.sm, paddingVertical: 4, borderRadius: ROUNDING.full },
-  headBadgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
-
-  paymentCard: { backgroundColor: COLORS.white, borderRadius: ROUNDING.sm, padding: SPACE.md, marginBottom: SPACE.sm, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
-  payAmount: { fontSize: 16, fontWeight: 'bold', color: COLORS.text, marginBottom: 2 },
-  payDate: { fontSize: 12, color: COLORS.textLight },
-  payUser: { fontSize: 12, color: COLORS.secondary, fontWeight: '500' },
-  emptyText: { color: COLORS.textLight, fontStyle: 'italic' }
+  memberName: { fontFamily: TYPOGRAPHY.fontFamilyBold, fontSize: 15, fontWeight: 'bold', color: '#1F2937' },
+  memberMeta: { fontFamily: TYPOGRAPHY.fontFamily, fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  headBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  headBadgeText: { fontFamily: TYPOGRAPHY.fontFamilyBold, color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+  rowDivider: { position: 'absolute', bottom: 0, left: 16, right: 16, height: 1, backgroundColor: '#F3F4F6' },
+  paymentCard: { backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
+  payAmount: { fontFamily: TYPOGRAPHY.monospace, fontSize: 16, fontWeight: 'bold', color: '#1F2937', marginBottom: 4 },
+  payDate: { fontFamily: TYPOGRAPHY.fontFamily, fontSize: 12, color: '#9CA3AF', marginBottom: 2 },
+  payMeta: { fontFamily: TYPOGRAPHY.fontFamilyMedium, fontSize: 12, color: '#3D8EE8' },
+  emptyText: { fontFamily: TYPOGRAPHY.fontFamily, color: '#9CA3AF', fontSize: 15, paddingVertical: 20, textAlign: 'center' },
 });
