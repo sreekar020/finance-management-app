@@ -166,17 +166,7 @@ We implement server-side validation using **Cloud Firestore Security Rules** to 
 
 ---
 
-## 📱 User Interface & Visuals
 
-Here is a visual overview of the application flow. 
-
-| Role Selection / Auth | Admin Tour List | Expense Manager | Customer Board |
-| :---: | :---: | :---: | :---: |
-| <img src="https://raw.githubusercontent.com/your-username/your-repo-name/main/assets/screenshots/login.png" width="200" alt="Login View" /> | <img src="https://raw.githubusercontent.com/your-username/your-repo-name/main/assets/screenshots/admin_dashboard.png" width="200" alt="Admin Tour Board" /> | <img src="https://raw.githubusercontent.com/your-username/your-repo-name/main/assets/screenshots/expense_log.png" width="200" alt="Expenses Board" /> | <img src="https://raw.githubusercontent.com/your-username/your-repo-name/main/assets/screenshots/customer_profile.png" width="200" alt="Customer Details" /> |
-
-*(To host screenshots: create a `/assets/screenshots` folder in your repo, upload your images, and update the URLs above!)*
-
----
 
 ## 🚀 Future Roadmap & Enhancements
 
